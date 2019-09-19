@@ -7,6 +7,7 @@ var app = new Framework7({
   // App id
   id: 'net.peiryd.tracker',
 });
+var db = openDatabase('trackerdb', '1.0', 'Tracker_DB', 5 * 1024 * 1024);
 
 var range = app.range.create({
   el: '.range-slider',
@@ -26,7 +27,7 @@ var lblDate = document.getElementById('date-last-position');
 var msMultiplier = 1000;
 
 var interval = setInterval(intervalTick, intervalInSeconds * msMultiplier);
-var longitude, latitude,googlemap, dt;
+var longitude, latitude, googlemap, dt;
 function intervalChanged() {
   intervalInSeconds = range.value;
   lblInterval.innerText = intervalInSeconds;
@@ -45,14 +46,18 @@ function intervalTick() {
 function startInterval(_interval) {
   interval = setInterval(intervalTick, _interval);
 }
+
 var onSuccess = function (position) {
-  latitude = position.coords.latitude;
-  longitude = position.coords.longitude;
+  latitude = position.coords.latitude.toFixed(4);
+  longitude = position.coords.longitude.toFixed(4);
 
   openstreemap = `https://staticmap.openstreetmap.de/staticmap.php?center=${latitude},${longitude}&zoom=14&size=865x512&maptype=mapnik`;
-  googlemap = `https://www.google.com/maps/@${latitude},${longitude}`
-  lblLatitude.innerText = latitude.toFixed(2);
-  lblLongitude.innerText = longitude.toFixed(2);
+  googlemap = generateGmapLink(latitude, longitude);
+  lblLatitude.innerText = latitude;
+  lblLongitude.innerText = longitude;
+  ts = Math.floor(dt.getTime() / 1000);
+  insertData(latitude, longitude, ts);
+  addToSelect(ts);
 }
 
 var onError = function (error) {
@@ -60,12 +65,34 @@ var onError = function (error) {
 }
 
 function showMap(site) {
-    window.open(googlemap);
+  window.open(googlemap);
 }
 
-function displayDate(){
-  lblDate.innerText = `${dt.getDate()}.${dt.getMonth()+1}.${dt.getFullYear()} à ${dt.getHours()}:${dt.getMinutes()}:${dt.getSeconds()}`
+function displayDate() {
+  lblDate.innerText = formatDate(dt.getTime());
 }
 
 intervalTick();
+
+function addToSelect(ts) {
+  var select = document.getElementById('history_positions');
+  var o = document.createElement('option');
+  o.text = formatDate(ts * 1000);
+  o.value = ts;
+  select.prepend(o);
+  select.selectedIndex = 0;
+}
+function formatDate(timestamp) {
+  var d = new Date(timestamp);
+  return `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()} ${d.getHours()}:${d.getMinutes()}:${d.getSeconds()}`;
+}
+
+function generateGmapLink(latitude, longitude) {
+  return `https://www.google.com/maps/@${latitude},${longitude},15z`;
+}
+
+$$('#history_positions').on('change', function (e) {
+  var val = $$(e.target).val();
+  getPosFromTimestamp(val);
+})
 
